@@ -1,6 +1,5 @@
 "use client";
 import React from "react";
-import { toast } from "sonner";
 import { useCompletion } from "ai/react";
 
 import { Button } from "~/components/ui/button";
@@ -12,9 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Loader } from "lucide-react";
-import { cn } from "~/lib/utils";
+import { Copy, Loader } from "lucide-react";
 import { Label } from "~/components/ui/label";
+import MarkdownRenderer from "~/components/markdown-renderer";
+import { toast } from "sonner";
 
 export default function Home() {
   const [origin, setOrigin] = React.useState("https://www.amazon.com");
@@ -27,7 +27,7 @@ export default function Home() {
     handleInputChange,
     handleSubmit: startGeneration,
     isLoading,
-    data,
+    error,
   } = useCompletion({
     api: "/api/roundup",
     body: {
@@ -35,7 +35,13 @@ export default function Home() {
       productCount: parseInt(productCount),
     },
   });
-  console.log("🚀 ~ Home ~ data:", data);
+
+  React.useEffect(() => {
+    if (error) {
+      console.error(error?.stack);
+      toast.error(error?.message);
+    }
+  }, [error]);
 
   return (
     <main className="px-2">
@@ -48,7 +54,6 @@ export default function Home() {
               value={input}
               onChange={handleInputChange}
               name="term"
-              disabled={isLoading}
               autoComplete="off"
             />
           </div>
@@ -107,12 +112,38 @@ export default function Home() {
         </form>
       </section>
       {completion && (
-        <section
-          className={cn("bg-secondary mx-auto mt-20 h-80 max-w-4xl rounded-md p-6")}
-        >
-          {completion}
+        <section className="relative mb-20 max-w-4xl mx-auto">
+          <CopyButton text={completion} disabled={isLoading} />
+          <MarkdownRenderer
+            className="bg-secondary mt-20 rounded-md border px-8 py-6"
+            markdown={completion}
+          />
         </section>
       )}
     </main>
   );
 }
+
+function CopyButton({
+  text,
+  disabled = false,
+}: {
+  text: string;
+  disabled?: boolean;
+}) {
+  function copy() {
+    void navigator.clipboard.writeText(text);
+  }
+  return (
+    <Button
+      size="icon"
+      variant="secondary"
+      className="absolute right-4 top-4"
+      disabled={disabled}
+      onClick={copy}
+    >
+      <Copy size={16} />
+    </Button>
+  );
+}
+

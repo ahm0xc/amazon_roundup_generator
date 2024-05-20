@@ -29,13 +29,22 @@ export async function POST(req: Request) {
     productCount: productCount,
   });
 
-  const systemPrompt = `You write brief seo optimized,knowledgeable,neutral, and clear (minimum 2000 words) product roundup based on given product information by user. Return the response in markdown. Format the markdown to use bullets,headings,links, images, and so on. Be creative with your result must write the following sections for every product.
-- Title & image (show the image as banner and product name as title, make the product name nicer)
+  const systemPrompt = `You write brief seo optimized,knowledgeable,neutral, and clear (minimum 1500 words) product roundup based on given product information by user. Return the response in markdown. Format the markdown to use bullets,headings,links, images, and so on. Be creative with your result must write the following sections for every product.
+- Headline: A catchy and informative headline that summarizes the roundup.
+- Introduction: A brief overview of the product category and why it's important or relevant.
+- What matter in this? (show some relative information about what matters about this product)
+
+Product overviews: For each product:
+- Title (show the product name here in a nicer way)
+- image (show the image as banner, not in a list item)
+- description (describe the product best way possible)
 - About this item
 - Features
 - Average Customer Review
-- Customers Say
+- Customers Say (optional)
 - pros & cons
+
+- Conclusion: Summarize the roundup and recommend a product based on different needs or budgets.
 add a product link in the bottom
 `;
 
@@ -72,10 +81,10 @@ ${d?.customersSaying}
 `;
 
   const result = await streamText({
-    model: openai("gpt-3.5-turbo"),
+    model: openai("gpt-4-turbo-preview"),
     system: systemPrompt,
     prompt,
-    maxTokens: 4000,
+    maxTokens: 4096,
   });
 
   return new StreamingTextResponse(result.toAIStream());
@@ -138,7 +147,7 @@ async function getProductInfo(link: string) {
     let title: string;
     let description: string;
     const aboutThisItem: string[] = [];
-    let customersSaying: string;
+    let customersSaying: string = "";
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { data: html, request } = await axios.get(link);
@@ -153,17 +162,18 @@ async function getProductInfo(link: string) {
     imageUrl = imgEl.src;
 
     // get title
-    title = document.querySelector("#title").textContent;
+    title = document.querySelector("#title")?.textContent ?? "";
 
     // get description
-    description = document
-      .querySelector("meta[name='description']")
-      .getAttribute("content");
+    description =
+      document
+        .querySelector("meta[name='description']")
+        ?.getAttribute("content") ?? "";
     // get about this item
     const aboutThisItemUl = document.querySelector(
       "ul.a-unordered-list.a-vertical.a-spacing-mini",
     );
-    aboutThisItemUl.querySelectorAll("li>span").forEach((span) => {
+    aboutThisItemUl?.querySelectorAll("li>span").forEach((span) => {
       const text = span.textContent?.trim();
       if (text) {
         aboutThisItem.push(text);
@@ -174,19 +184,19 @@ async function getProductInfo(link: string) {
       "#cr-product-insights-cards p.a-spacing-small > span",
     );
     if (customersSayingEl) {
-      customersSaying = customersSayingEl.textContent;
+      customersSaying = customersSayingEl.textContent ?? "";
     }
     // details section html
     const detailsSectionEL = document.querySelector("#centerCol");
 
     // average customer review
-    const averageCustomerReviewUnSafeHtml = detailsSectionEL.querySelector(
+    const averageCustomerReviewUnSafeHtml = detailsSectionEL?.querySelector(
       "#averageCustomerReviews_feature_div",
-    ).innerHTML;
+    )?.innerHTML;
     const averageCustomerReview = extractTextFromHTML(
       removeWhitespace(
         removeAllAttributes(
-          removeScriptAndStyleTags(averageCustomerReviewUnSafeHtml),
+          removeScriptAndStyleTags(averageCustomerReviewUnSafeHtml ?? ""),
         ),
       ),
     );
@@ -196,8 +206,8 @@ async function getProductInfo(link: string) {
       removeWhitespace(
         removeAllAttributes(
           removeScriptAndStyleTags(
-            detailsSectionEL.querySelector("#productOverview_feature_div")
-              .innerHTML ?? "",
+            detailsSectionEL?.querySelector("#productOverview_feature_div")
+              ?.innerHTML ?? "",
           ),
         ),
       ),
